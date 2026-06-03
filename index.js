@@ -6,17 +6,26 @@ const app = express();
 
 app.use(express.json());
 
+const authMiddleware = require("./middleware/authMiddleware");
+
+app.get("/profile", authMiddleware, (req, res)=>{
+    res.status(200).json({
+        success: true,
+        user: req.user,
+    });
+});
+
 app.get("/", (req,res) => {
      res.send("Expense Tracker API");
 });
 
 app.get("/test", async (req,res) => {
     try{
-        const collection = await db.listCollections();
+        const collections = await db.listCollections();
 
         res.status(200).json({
             success:true,
-            collection: collection.map((c)=>c.id),
+            collections: collections.map((c)=>c.id),
         });
 
     }
