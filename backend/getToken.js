@@ -1,3 +1,4 @@
+require("dotenv").config();
 const fs = require("fs");
 
 const { initializeApp } = require("firebase/app");
@@ -7,12 +8,12 @@ const {
 } = require("firebase/auth");
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCcsT18YvOdHYzwuZsG6sm-3x1XcmFxmpI",
-  authDomain: "expense-tracker-970b1.firebaseapp.com",
-  projectId: "expense-tracker-970b1",
-  storageBucket: "expense-tracker-970b1.firebasestorage.app",
-  messagingSenderId: "786237174052",
-  appId: "1:786237174052:web:1c76edee7dd2da8a1803b1",
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -22,8 +23,8 @@ async function login() {
   try {
     const userCredential = await signInWithEmailAndPassword(
       auth,
-      "test@gmail.com",
-      "123456"
+      process.env.EMAIL,
+      process.env.PASSWORD
     );
 
     const token = await userCredential.user.getIdToken();
