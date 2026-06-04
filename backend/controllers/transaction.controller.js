@@ -1,3 +1,6 @@
+const { parseISO } = require("date-fns");
+const { Timestamp } = require("firebase-admin/firestore");
+
 const { firestore } = require("firebase-admin");
 const { db, admin } = require("../config/firebase");
 
@@ -54,13 +57,33 @@ const getTransactions = async (req, res) => {
   try {
     const uid = req.user.uid;
 
-    const snapshot = await db
-      .collection("users")
-      .doc(uid)
-      .collection("transactions")
-      .orderBy("date", "desc")
-      .get();
+    const {
+      type,
+      category,
+      startDate,
+      endDate,
+      sortBy = "date",
+      sortOrder = "desc",
+    } = req.query;
 
+    let query = db.collection("users").doc(uid).collection("transactions");
+
+    if (type) {
+      query = query.where("type", "==", type);
+    }
+    if (category) {
+      query = query.where("category", "==", category);
+    }
+
+    const validSortFields = ["amount", "date"];
+
+    query = query.orderBy(
+      validSortFields.includes(sortBy) ? sortBy : "date",
+      sortOrder == "asc"
+      ? "asc" : "desc",
+    );
+     console.log(req.query);
+    const snapshot = await query.get();
     const transactions = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -69,7 +92,12 @@ const getTransactions = async (req, res) => {
       success: true,
       transactions,
     });
-  } catch (error) {
+
+   
+  } 
+  
+ 
+  catch (error) {
     return res.status(500).json({
       success: false,
       message: error.message,
