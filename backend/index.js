@@ -15,6 +15,9 @@ app.get("/profile", authMiddleware, (req, res)=>{
     });
 });
 
+const transactionRoutes = require("./routes/transaction.routes");
+app.use("/transactions",transactionRoutes);
+
 app.get("/", (req,res) => {
      res.send("Expense Tracker API");
 });

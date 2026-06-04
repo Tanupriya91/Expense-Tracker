@@ -27,7 +27,7 @@ const createTransaction = async (req, res) => {
     const transactionRef = await db
       .collection("users")
       .doc(uid)
-      .collection("transaction")
+      .collection("transactions")
       .add({
         amount,
         type,
@@ -39,7 +39,7 @@ const createTransaction = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      id: transactionRef,
+      id: transactionRef.id,
     });
   } catch (error) {
     return res.status(500).json({
