@@ -6,6 +6,7 @@ const {
     createTransaction,
     getTransactions,
     getTransactionById,
+    updateTransaction,
 
 } = require("../controllers/transaction.controller");
 

@@ -1,3 +1,4 @@
+const { firestore } = require("firebase-admin");
 const { db, admin } = require("../config/firebase");
 
 const createTransaction = async (req, res) => {
@@ -156,18 +157,26 @@ const updateTransaction = async (req,res) => {
             });
         }
         await docRef.update({
-            
+            ...(amount !== undefined && {amount}),
+            ...(type && {type}),
+            ...(category && {category}),
+            ...(date && {date}),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return res.status(200).json({
+            success: true,
+            message: "Transaction updated succeesssfully",
         })
 
 
     }
     catch(error){
-
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
     }
-}
+};
 
 
-
-
-
-module.exports = { createTransaction, getTransactions, getTransactionById };
+module.exports = { createTransaction, getTransactions, getTransactionById ,updateTransaction};
