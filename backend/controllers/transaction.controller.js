@@ -120,63 +120,112 @@ const getTransactionById = async (req, res) => {
   }
 };
 
-const updateTransaction = async (req,res) => {
-    try{
-        const uid = req.user.uid;
-        const {id} = req.params;
-        const {amount, type, category, date} = req.body;
+const updateTransaction = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
+    const { amount, type, category, date } = req.body;
 
-        const docRef = db.collection("users").doc(uid).collection("transactions").doc(id);
+    const docRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .doc(id);
 
-        const doc = await docRef.get();
+    const doc = await docRef.get();
 
-        if(!doc.exists){
-            return res.status(404).json({
-                success: false,
-                message: "Transaction not found",
-            });
-        }
-        const transaction = doc.data();
-
-        if(transaction.userId !== uid){
-            return res.status(403).json({
-                success: false,
-                message: "Access denied",
-            });
-        }
-        if(amount && amount <=0){
-            return res.status(400).json({
-                success: false,
-                message: "Amount must be greater than 0",
-            });
-        }
-        if(type && !["income", "expense"].includes(type)){
-            return res.status(400).json({
-                success: false,
-                message: "Invalid transaction type",
-            });
-        }
-        await docRef.update({
-            ...(amount !== undefined && {amount}),
-            ...(type && {type}),
-            ...(category && {category}),
-            ...(date && {date}),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        return res.status(200).json({
-            success: true,
-            message: "Transaction updated succeesssfully",
-        })
-
-
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found",
+      });
     }
-    catch(error){
-        return res.status(500).json({
-            success: false,
-            message: error.message,
-        });
+    const transaction = doc.data();
+
+    if (transaction.userId !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
     }
+    if (amount && amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be greater than 0",
+      });
+    }
+    if (type && !["income", "expense"].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid transaction type",
+      });
+    }
+    await docRef.update({
+      ...(amount !== undefined && { amount }),
+      ...(type && { type }),
+      ...(category && { category }),
+      ...(date && { date }),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Transaction updated succeesssfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
+const deleteTransaction = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { id } = req.params;
 
-module.exports = { createTransaction, getTransactions, getTransactionById ,updateTransaction};
+    const docRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .doc(id);
+
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found",
+      });
+    }
+
+    const transaction = doc.data();
+
+    if (transaction.userId !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: "Acess denied",
+      });
+    }
+
+    await docRef.delete();
+
+    return res.status(200).json({
+      success: true,
+      message: "Transaction deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+module.exports = {
+  createTransaction,
+  getTransactions,
+  getTransactionById,
+  updateTransaction,
+  deleteTransaction,
+};
