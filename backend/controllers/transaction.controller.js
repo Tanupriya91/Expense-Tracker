@@ -1,4 +1,4 @@
-const { parseISO } = require("date-fns");
+const { parseISO, parse, startOfMonth, endOfMonth } = require("date-fns");
 const { Timestamp } = require("firebase-admin/firestore");
 
 const { firestore } = require("firebase-admin");
@@ -113,16 +113,198 @@ const getTransactions = async (req, res) => {
       }
     }
 
-    query = query.limit(pageLimit);
+    query = query.limit(pageLimit + 1);
 
     const snapshot = await query.get();
-    const transactions = snapshot.docs.map((doc) => ({
+
+    let nextCursor = null;
+
+    let docs = snapshot.docs;
+
+    if (docs.length > pageLimit) {
+      docs.pop();
+
+      nextCursor = docs[docs.length - 1].id;
+    }
+
+    const transactions = docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
     return res.status(200).json({
       success: true,
       transactions,
+      nextCursor,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const getMonthlySummary = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    const { month } = req.query;
+
+    if (!month) {
+      return res.status(400).json({
+        success: false,
+        message: "Month is required",
+      });
+    }
+
+    const monthDate = parse(month, "yyyy-MM", new Date());
+
+    const monthStart = startOfMonth(monthDate);
+
+    const monthEnd = endOfMonth(monthDate);
+
+    const startTimestamp = Timestamp.fromDate(monthStart);
+
+    const endTimestamp = Timestamp.fromDate(monthEnd);
+
+    const incomeQuery = db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .where("date", ">=", startTimestamp)
+      .where("date", "<=", endTimestamp)
+      .where("type", "==", "income");
+
+    const incomeAggregate = await incomeQuery
+      .aggregate({
+        totalIncome: firestore.AggregateField.sum("amount"),
+      })
+      .get();
+    const totalIncome = incomeAggregate.data().totalIncome || 0;
+
+    const expenseQuery = db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .where("date", ">=", startTimestamp)
+      .where("date", "<=", endTimestamp)
+      .where("type", "==", "expense");
+
+    const expenseAggregate = await expenseQuery
+      .aggregate({
+        totalExpenses: firestore.AggregateField.sum("amount"),
+      })
+      .get();
+
+    const totalExpenses = expenseAggregate.data().totalExpenses || 0;
+
+    const netBalance = totalIncome - totalExpenses;
+    const countAggregate = await db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .where("date", ">=", startTimestamp)
+      .where("date", "<=", endTimestamp)
+      .count()
+      .get();
+
+    const transactionCount = countAggregate.data().count;
+
+    const snapshot = await db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .where("date", ">=", startTimestamp)
+      .where("date", "<=", endTimestamp)
+      .get();
+
+    return res.status(200).json({
+      month,
+      totalIncome,
+      totalExpenses,
+      netBalance,
+      transactionCount,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const getCategoryBreakdown = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+    const { month } = req.query;
+
+    if (!month) {
+      return res.status(400).json({
+        success: false,
+        message: "Month is required",
+      });
+    }
+
+    const monthDate = parse(month, "yyyy-MM", new Date());
+    const monthStart = startOfMonth(monthDate);
+
+    const monthEnd = endOfMonth(monthDate);
+
+    const startTimestamp = Timestamp.fromDate(monthStart);
+
+    const endTimestamp = Timestamp.fromDate(monthEnd);
+
+    const snapshot = await db
+      .collection("users")
+      .doc(uid)
+      .collection("transactions")
+      .where("date", ">=", startTimestamp)
+      .where("date", "<=", endTimestamp)
+      .get();
+
+    const transactions = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    const expenseTransactions = transactions.filter(
+  (transaction) => transaction.type === "expense"
+);
+    const grouped = expenseTransactions.reduce((acc, transaction) => {
+      const category = transaction.category;
+
+      if (!acc[category]) {
+        acc[category] = {
+          category,
+          total: 0,
+          count: 0,
+        };
+      }
+
+      acc[category].total += transaction.amount;
+      acc[category].count += 1;
+
+      return acc;
+    }, {});
+
+    const breakdown = Object.values(grouped);
+
+    const totalExpenses = transactions
+      .filter((transaction) => transaction.type === "expense")
+      .reduce((sum, transaction) => {
+        return sum + transaction.amount;
+      }, 0);
+
+    breakdown.forEach((item) => {
+      item.percentage =
+        totalExpenses > 0
+          ? Number(((item.total / totalExpenses) * 100).toFixed(2))
+          : 0;
+    });
+    breakdown.sort((a, b) => b.total - a.total);
+
+    return res.status(200).json({
+      month,
+      breakdown,
     });
   } catch (error) {
     return res.status(500).json({
@@ -280,6 +462,8 @@ const deleteTransaction = async (req, res) => {
 module.exports = {
   createTransaction,
   getTransactions,
+  getMonthlySummary,
+  getCategoryBreakdown,
   getTransactionById,
   updateTransaction,
   deleteTransaction,
