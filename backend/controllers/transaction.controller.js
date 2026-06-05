@@ -36,7 +36,7 @@ const createTransaction = async (req, res) => {
         amount,
         type,
         category,
-        date,
+        date: Timestamp.fromDate(parseISO(date)),
         userId: uid,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -64,7 +64,12 @@ const getTransactions = async (req, res) => {
       endDate,
       sortBy = "date",
       sortOrder = "desc",
+      limit = 10,
+      startAfter,
     } = req.query;
+
+    console.log("startAfter =", startAfter);
+    const pageLimit = Math.min(parseInt(limit) || 10, 50);
 
     let query = db.collection("users").doc(uid).collection("transactions");
 
@@ -75,14 +80,41 @@ const getTransactions = async (req, res) => {
       query = query.where("category", "==", category);
     }
 
+    if (startDate) {
+      query = query.where(
+        "date",
+        ">=",
+        Timestamp.fromDate(parseISO(startDate)),
+      );
+    }
+    if (endDate) {
+      query = query.where("date", "<=", Timestamp.fromDate(parseISO(endDate)));
+    }
+
     const validSortFields = ["amount", "date"];
 
     query = query.orderBy(
       validSortFields.includes(sortBy) ? sortBy : "date",
-      sortOrder == "asc"
-      ? "asc" : "desc",
+      sortOrder == "asc" ? "asc" : "desc",
     );
-     console.log(req.query);
+
+    console.log(req.query);
+
+    if (startAfter) {
+      const cursorDoc = await db
+        .collection("users")
+        .doc(uid)
+        .collection("transactions")
+        .doc(startAfter)
+        .get();
+
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    }
+
+    query = query.limit(pageLimit);
+
     const snapshot = await query.get();
     const transactions = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -92,12 +124,7 @@ const getTransactions = async (req, res) => {
       success: true,
       transactions,
     });
-
-   
-  } 
-  
- 
-  catch (error) {
+  } catch (error) {
     return res.status(500).json({
       success: false,
       message: error.message,
